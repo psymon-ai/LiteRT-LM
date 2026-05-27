@@ -9,7 +9,7 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+# See the License for the specific language govening permissions and
 # limitations under the License.
 
 load("@org_tensorflow//tensorflow:pytype.default.bzl", "pytype_strict_binary", "pytype_strict_library")
@@ -32,6 +32,11 @@ licenses(["notice"])
 flatbuffer_py_library(
     name = "litertlm_header_schema_py",
     srcs = ["//schema/core:litertlm_header_schema.fbs"],
+)
+
+flatbuffer_py_library(
+    name = "tflite_schema_py",
+    srcs = ["@litert//tflite/converter/schema:schema.fbs"],
 )
 
 pytype_strict_library(
@@ -150,6 +155,68 @@ py_test(
     deps = [":audio_lora_converter"],
 )
 
+py_library(
+    name = "audio_lora_graph_checker",
+    srcs = ["audio_lora_graph_checker.py"],
+    visibility = ["//visibility:public"],
+    deps = [":audio_lora_converter"],
+)
+
+py_binary(
+    name = "audio_lora_graph_checker_cli",
+    srcs = ["audio_lora_graph_checker_cli.py"],
+    imports = [".."],
+    main = "audio_lora_graph_checker_cli.py",
+    tags = [
+        "manual",
+        "notap",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":audio_lora_graph_checker"],
+)
+
+py_test(
+    name = "audio_lora_graph_checker_test",
+    srcs = ["audio_lora_graph_checker_test.py"],
+    imports = [".."],
+    deps = [":audio_lora_graph_checker"],
+)
+
+py_library(
+    name = "audio_lora_graph_rewriter",
+    srcs = ["audio_lora_graph_rewriter.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":tflite_schema_py",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
+py_binary(
+    name = "audio_lora_graph_rewriter_cli",
+    srcs = ["audio_lora_graph_rewriter_cli.py"],
+    imports = [".."],
+    main = "audio_lora_graph_rewriter_cli.py",
+    tags = [
+        "manual",
+        "notap",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":audio_lora_graph_rewriter"],
+)
+
+py_test(
+    name = "audio_lora_graph_rewriter_test",
+    srcs = ["audio_lora_graph_rewriter_test.py"],
+    imports = [".."],
+    deps = [
+        ":audio_lora_graph_checker",
+        ":audio_lora_graph_rewriter",
+        ":tflite_schema_py",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
 pytype_strict_binary(
     name = "litertlm_builder_cli",
     srcs = ["litertlm_builder_cli.py"],
@@ -208,7 +275,12 @@ genrule(
         "litertlm_peek_main.py",
         "audio_lora_converter.py",
         "audio_lora_converter_cli.py",
+        "audio_lora_graph_checker.py",
+        "audio_lora_graph_checker_cli.py",
+        "audio_lora_graph_rewriter.py",
+        "audio_lora_graph_rewriter_cli.py",
         ":litertlm_header_schema_py",
+        ":tflite_schema_py",
         "//runtime/proto:llm_metadata_py_pb2",
         "//runtime/proto:llm_model_type_py_pb2",
         "//runtime/proto:sampler_params_py_pb2",
@@ -223,7 +295,12 @@ genrule(
         "shaded/litert_lm_builder/litertlm_peek_main.py",
         "shaded/litert_lm_builder/audio_lora_converter.py",
         "shaded/litert_lm_builder/audio_lora_converter_cli.py",
+        "shaded/litert_lm_builder/audio_lora_graph_checker.py",
+        "shaded/litert_lm_builder/audio_lora_graph_checker_cli.py",
+        "shaded/litert_lm_builder/audio_lora_graph_rewriter.py",
+        "shaded/litert_lm_builder/audio_lora_graph_rewriter_cli.py",
         "shaded/litert_lm_builder/litertlm_header_schema_py_generated.py",
+        "shaded/litert_lm_builder/tflite_schema_py_generated.py",
         "shaded/litert_lm_builder/runtime/proto/llm_metadata_pb2.py",
         "shaded/litert_lm_builder/runtime/proto/llm_model_type_pb2.py",
         "shaded/litert_lm_builder/runtime/proto/sampler_params_pb2.py",
@@ -278,6 +355,8 @@ py_wheel(
             "litert-lm-builder = litert_lm_builder.litertlm_builder_cli:run",
             "litert-lm-peek = litert_lm_builder.litertlm_peek_main:run",
             "litert-lm-audio-lora-converter = litert_lm_builder.audio_lora_converter_cli:main",
+            "litert-lm-audio-lora-graph-checker = litert_lm_builder.audio_lora_graph_checker_cli:main",
+            "litert-lm-audio-lora-graph-rewriter = litert_lm_builder.audio_lora_graph_rewriter_cli:main",
         ],
     },
     requires_file = ":gen_requires",
