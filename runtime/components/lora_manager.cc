@@ -68,6 +68,8 @@ absl::Status LoraManager::UseLoRA(uint32_t lora_id) {
   return absl::OkStatus();
 }
 
+void LoraManager::ClearLoRA() { current_lora_id_.reset(); }
+
 absl::StatusOr<absl::flat_hash_map<absl::string_view, litert::TensorBuffer>>
 LoraManager::GetLoRABuffers() const {
   if (!current_lora_id_.has_value()) {

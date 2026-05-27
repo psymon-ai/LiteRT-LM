@@ -118,6 +118,22 @@ TEST_F(LoraManagerTest, GetCurrentLoRAIdSuccess) {
   EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), 0);
 }
 
+TEST_F(LoraManagerTest, ClearLoRAClearsCurrentId) {
+  ASSERT_OK_AND_ASSIGN(ModelAssets model_assets,
+                       ModelAssets::Create(GetLoraOnesFilePath()));
+  ASSERT_OK(lora_manager_->LoadLoRA(0, model_assets));
+  ASSERT_OK(lora_manager_->UseLoRA(0));
+  ASSERT_EQ(lora_manager_->GetCurrentLoRAId(), 0);
+
+  lora_manager_->ClearLoRA();
+  EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), std::nullopt);
+  EXPECT_THAT(lora_manager_->GetLoRABuffers(),
+              StatusIs(absl::StatusCode::kFailedPrecondition));
+
+  EXPECT_OK(lora_manager_->UseLoRA(0));
+  EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), 0);
+}
+
 TEST_F(LoraManagerTest, GetLoRABuffersFailsBeforeUse) {
   ASSERT_OK_AND_ASSIGN(ModelAssets model_assets,
                        ModelAssets::Create(GetLoraOnesFilePath()));

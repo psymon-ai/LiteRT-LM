@@ -943,6 +943,7 @@ cc_library(
         "//runtime/util:convert_tensor_buffer",
         "//runtime/util:file_util",
         "//runtime/util:litert_status_util",
+        "//runtime/util:lora_util",
         "//runtime/util:scoped_file",
         "//runtime/util:tensor_buffer_util",
         "@litert//tflite/delegates/xnnpack:xnnpack_delegate",

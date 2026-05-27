@@ -60,6 +60,9 @@ class LoraManager {
   // doesn't exist, it will be created.
   absl::Status UseLoRA(uint32_t lora_id);
 
+  // Clears the current LoRA selection without unloading any loaded LoRA data.
+  void ClearLoRA();
+
   // Returns a map of all the LoRA tensor names to their duplicated
   // TensorBuffers for the current LoRA ID.
   absl::StatusOr<absl::flat_hash_map<absl::string_view, litert::TensorBuffer>>

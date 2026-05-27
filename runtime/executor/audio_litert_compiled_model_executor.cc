@@ -55,6 +55,7 @@
 #include "runtime/executor/llm_executor_io_types.h"
 #include "runtime/util/convert_tensor_buffer.h"  // IWYU pragma: keep
 #include "runtime/util/file_util.h"
+#include "runtime/util/lora_util.h"
 #include "runtime/util/status_macros.h"
 #include "runtime/util/tensor_buffer_util.h"
 #include "tflite/delegates/xnnpack/xnnpack_delegate.h"  // from @litert
@@ -200,8 +201,17 @@ absl::Status AudioLiteRtCompiledModelExecutor::AudioEncoder::UseLoRA(
     return lora_manager_->UseLoRA(lora_id.value());
   }
 
-  // TODO: b/515389724 - Support unloading/clearing LoRA buffers from
-  // input_buffers_map_ when LoRA is deactivated for subsequent audio calls.
+  if (lora_manager_ != nullptr) {
+    lora_manager_->ClearLoRA();
+  }
+  for (auto it = input_buffers_map_.begin(); it != input_buffers_map_.end();) {
+    if (IsLoRAInputName(it->first)) {
+      auto erase_it = it++;
+      input_buffers_map_.erase(erase_it);
+    } else {
+      ++it;
+    }
+  }
   return absl::OkStatus();
 }
 
@@ -297,8 +307,11 @@ AudioLiteRtCompiledModelExecutor::AudioStaticEncoder::Initialize() {
   input_names_.reserve(signature.InputNames().size());
   for (int i = 0; i < signature.InputNames().size(); ++i) {
     std::string input_name = std::string(signature.InputNames()[i]);
+    if (IsLoRAInputName(input_name)) {
+      continue;
+    }
     input_names_.push_back(input_name);
-    absl::string_view input_name_view = input_names_[i];
+    absl::string_view input_name_view = input_names_.back();
     input_buffers_map_[input_name_view] = std::move(input_buffers[i]);
   }
 
@@ -445,8 +458,11 @@ AudioLiteRtCompiledModelExecutor::AudioStreamingEncoder::Initialize() {
   input_names_.reserve(signature.InputNames().size());
   for (int i = 0; i < signature.InputNames().size(); ++i) {
     std::string input_name = std::string(signature.InputNames()[i]);
+    if (IsLoRAInputName(input_name)) {
+      continue;
+    }
     input_names_.push_back(input_name);
-    absl::string_view input_name_view = input_names_[i];
+    absl::string_view input_name_view = input_names_.back();
     input_buffers_map_[input_name_view] = std::move(input_buffers[i]);
   }
 
@@ -952,6 +968,9 @@ AudioLiteRtCompiledModelExecutor::AudioStreamingEncoder::CreateNewContext() {
       // state.
       continue;
     }
+    if (IsLoRAInputName(name)) {
+      continue;
+    }
     LITERT_ASSIGN_OR_RETURN(auto new_buffer, CopyTensorBuffer(env_, buffer));
     if (name == kPrevMaskName) {
       LITERT_ASSIGN_OR_RETURN(auto prev_mask_type, buffer.TensorType());
@@ -979,6 +998,9 @@ AudioLiteRtCompiledModelExecutor::AudioStreamingEncoder::CloneContext() {
       // state.
       continue;
     }
+    if (IsLoRAInputName(name)) {
+      continue;
+    }
     LITERT_ASSIGN_OR_RETURN(auto new_buffer, CopyTensorBuffer(env_, buffer));
     state_buffers[name] = std::move(new_buffer);
   }
@@ -991,6 +1013,9 @@ absl::Status
 AudioLiteRtCompiledModelExecutor::AudioStreamingEncoder::RestoreContext(
     std::unique_ptr<AudioStreamingContext> audio_streaming_context) {
   for (auto& [name, buffer] : audio_streaming_context->state_buffers()) {
+    if (IsLoRAInputName(name)) {
+      continue;
+    }
     if (!input_buffers_map_.contains(name)) {
       return absl::InvalidArgumentError(
           absl::StrCat("The Audio Streaming Encoder model must have a ", name,
